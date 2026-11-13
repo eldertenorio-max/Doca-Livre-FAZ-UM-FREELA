@@ -101,7 +101,8 @@ export function AdminApp({
     window.location.reload()
   }
 
-  const navItems = ITEMS
+  // O Início saiu do menu: a logo do topo leva para ele.
+  const navItems = ITEMS.filter((item) => item.id !== 'inicio')
   const usuarioLogado = store.currentUser
   const nomeUsuario = usuarioLogado?.usuario || usuarioLogado?.email.split('@')[0] || 'Doca Livre'
   const papelUsuario =
@@ -156,10 +157,16 @@ export function AdminApp({
             <path d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
-        <div className="px-topbar-left">
+        <button
+          type="button"
+          className="px-topbar-left topo-logo-botao"
+          onClick={() => setSection('inicio')}
+          title="Ir para o início"
+          aria-label="Ir para o início"
+        >
           <img src={LOGO_DOCA_LIVRE_SRC} alt="Doca Livre" className="px-topbar-logo" />
           <strong className="px-topbar-brand">fazumfreela</strong>
-        </div>
+        </button>
         <div className="px-topbar-right" style={{ marginLeft: 'auto' }}>
           {onOpenConfig && (
             <button type="button" className="px-btn px-btn-outline" onClick={onOpenConfig}>

@@ -1414,10 +1414,11 @@ export function ContratarFreelancer({ onLogout }: { onLogout: () => void }) {
           >
             <span className="cf-topbar-menu-icon" aria-hidden />
           </button>
-          <div className="cf-topbar-brand">
+          {/* A logo leva para o Início (o Início saiu do menu lateral). */}
+          <button type="button" className="cf-topbar-brand topo-logo-botao" onClick={() => setAba('inicio')} title="Ir para o início" aria-label="Ir para o início">
             <img src={LOGO_DOCA_LIVRE_SRC} alt="Doca Livre" className="cf-topbar-logo" />
             <span className="cf-product">{BRAND_PRODUCT_NAME}</span>
-          </div>
+          </button>
         </div>
         <div className="cf-topbar-right">
           <SinoEmpresa empresaId={empresa.id} onIr={setAba} />
@@ -1467,7 +1468,7 @@ export function ContratarFreelancer({ onLogout }: { onLogout: () => void }) {
           onMouseLeave={() => setMenuHover(false)}
         >
           <nav className="cf-menu-body" aria-label="Conta da empresa">
-            {ABAS_EMPRESA.map((item) => {
+            {ABAS_EMPRESA.filter((item) => item.id !== 'inicio').map((item) => {
               const ativo = aba === item.id
               return (
                 <button

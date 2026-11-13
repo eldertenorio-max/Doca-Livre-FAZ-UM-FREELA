@@ -89,10 +89,11 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
           >
             <span className="cf-topbar-menu-icon" aria-hidden />
           </button>
-          <div className="cf-topbar-brand">
+          {/* A logo leva para o Início (o Início saiu do menu lateral). */}
+          <button type="button" className="cf-topbar-brand topo-logo-botao" onClick={() => setTab('inicio')} title="Ir para o início" aria-label="Ir para o início">
             <img src={LOGO_DOCA_LIVRE_SRC} alt="Doca Livre" className="cf-topbar-logo" />
             <span className="cf-product">{BRAND_PRODUCT_NAME}</span>
-          </div>
+          </button>
         </div>
         <div className="cf-topbar-right">
           <SinoTrabalhador
@@ -155,7 +156,7 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
           onMouseLeave={() => setMenuHover(false)}
         >
           <nav className="cf-menu-body" aria-label="Conta do trabalhador">
-            {TABS.map((item) => {
+            {TABS.filter((item) => item.id !== 'inicio').map((item) => {
               const ativo = tab === item.id
               return (
                 <button
