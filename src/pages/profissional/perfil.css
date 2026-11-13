@@ -1647,3 +1647,54 @@ button.td-chip {
     transition: none;
   }
 }
+
+/* Foto de perfil no "Editar perfil": prévia redonda e os botões ao lado. */
+.td-foto-linha {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.td-foto-previa {
+  flex: none;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: #111;
+  color: #f9db00;
+  font-size: 1.6rem;
+  font-weight: 800;
+  border: 3px solid #f9db00;
+}
+
+.td-foto-previa img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.td-foto-botoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+
+.td-link--perigo {
+  color: #dc2626;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* "Editar perfil" e avisos ocupam a linha toda: antes o botão esticava até a altura do cartão ao lado. */
+.td-painel > .td-editor-pri,
+.td-painel > .docs-ok,
+.td-painel > .error {
+  grid-column: 1 / -1;
+  align-self: start;
+}

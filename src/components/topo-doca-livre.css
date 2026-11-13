@@ -274,6 +274,17 @@
   color: var(--dl-texto-medio, #475569);
 }
 
+/* Adicionar / trocar / remover foto, lado a lado no painel do usuário. */
+.dl-perfil-acoes-foto {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.dl-perfil-acao-foto--remover {
+  color: #dc2626;
+}
+
 .dl-perfil-acao-foto {
   margin-top: 6px;
   padding: 0;

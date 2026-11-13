@@ -3,6 +3,7 @@ import { mascararCpf, mascararRg, mascararTelefone } from '../../lib/documentosP
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { AnexoCurriculo, CamposSobre, ListaExperiencias, conferirExperiencias } from '../../components/CurriculoCampos'
 import { MapaRaio } from '../../components/MapaRaio'
+import { RecorteFoto, carregarFotoParaRecorte } from '../../components/RecorteFoto'
 import { CATEGORIES, cargoLabel } from '../../data/categories'
 import { LOCAIS_OPERACAO } from '../../data/cidades'
 import { coordenadaDaCidade } from '../../lib/coordenadaCidade'
@@ -84,12 +85,10 @@ function rascunhoDe(prof: Profissional): Rascunho {
 
 export function EditorPerfil({
   prof,
-  fotoNova,
   onFechar,
   onSalvou,
 }: {
   prof: Profissional
-  fotoNova?: string
   onFechar: () => void
   onSalvou: () => void
 }) {
@@ -142,10 +141,33 @@ export function EditorPerfil({
   })
   const pixInfo = form.pix.trim() ? validarChavePix(form.pix) : null
 
+  // Foto trocada por fora (painel do topo) enquanto o editor está aberto: o rascunho acompanha.
+  const fotoSalva = useRef(prof.foto)
   useEffect(() => {
-    if (!fotoNova) return
-    setForm((atual) => ({ ...atual, foto: fotoNova }))
-  }, [fotoNova])
+    if (prof.foto === fotoSalva.current) return
+    fotoSalva.current = prof.foto
+    setForm((atual) => ({ ...atual, foto: prof.foto }))
+  }, [prof.foto])
+  const arquivoFotoRef = useRef<HTMLInputElement>(null)
+  const [fotoOriginal, setFotoOriginal] = useState<string | null>(null)
+  const [erroFoto, setErroFoto] = useState('')
+
+  async function escolherFoto(file: File | undefined) {
+    if (!file) return
+    try {
+      setFotoOriginal(await carregarFotoParaRecorte(file))
+      setErroFoto('')
+    } catch (falha) {
+      setErroFoto(falha instanceof Error ? falha.message : 'Não foi possível ler a foto.')
+    }
+  }
+  const iniciaisNome = form.nome
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((parte, indice, partes) => (indice === 0 || indice === partes.length - 1 ? parte[0] : ''))
+    .join('')
+    .toUpperCase()
 
   function set<K extends keyof Rascunho>(chave: K, valor: Rascunho[K]) {
     setForm((atual) => ({ ...atual, [chave]: valor }))
@@ -271,6 +293,52 @@ export function EditorPerfil({
 
   return (
     <div className="td-editor">
+      <section className="td-card">
+        <h2>Foto de perfil</h2>
+        <div className="td-foto-linha">
+          <span className="td-foto-previa" aria-hidden="true">
+            {form.foto ? <img src={form.foto} alt="" /> : <span>{iniciaisNome || '?'}</span>}
+          </span>
+          <div className="td-foto-botoes">
+            <button type="button" className="td-editor-sec" onClick={() => arquivoFotoRef.current?.click()}>
+              {form.foto ? 'Trocar foto' : 'Adicionar foto'}
+            </button>
+            {form.foto && (
+              <button type="button" className="td-link td-link--perigo" onClick={() => set('foto', '')}>
+                Remover foto
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="td-editor-resumo">
+          Use uma foto do rosto, de frente e com boa luz. Depois de escolher, você ajusta o enquadramento. Vale quando
+          tocar em Salvar perfil.
+        </p>
+        {erroFoto && <p className="error">{erroFoto}</p>}
+        <input
+          ref={arquivoFotoRef}
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          hidden
+          aria-hidden="true"
+          tabIndex={-1}
+          onChange={(evento) => {
+            void escolherFoto(evento.target.files?.[0])
+            evento.target.value = ''
+          }}
+        />
+        {fotoOriginal && (
+          <RecorteFoto
+            src={fotoOriginal}
+            onCancelar={() => setFotoOriginal(null)}
+            onConfirmar={(foto) => {
+              setFotoOriginal(null)
+              set('foto', foto)
+            }}
+          />
+        )}
+      </section>
+
       <section className="td-card">
         <h2>Currículo</h2>
         <p className="td-editor-resumo">
@@ -549,40 +617,4 @@ export function EditorPerfil({
       </div>
     </div>
   )
-}
-
-export function lerFotoPerfil(file: File) {
-  const tipoOk = /^image\/(jpeg|png|webp)$/.test(file.type) || /\.(jpe?g|png|webp)$/i.test(file.name)
-  if (!tipoOk) return Promise.reject(new Error('Envie uma foto JPG, PNG ou WEBP.'))
-  const url = URL.createObjectURL(file)
-  return new Promise<string>((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      const max = 480
-      const escala = Math.min(1, max / Math.max(img.width, img.height))
-      const largura = Math.max(1, Math.round(img.width * escala))
-      const altura = Math.max(1, Math.round(img.height * escala))
-      const canvas = document.createElement('canvas')
-      canvas.width = largura
-      canvas.height = altura
-      const ctx = canvas.getContext('2d')
-      URL.revokeObjectURL(url)
-      if (!ctx) {
-        reject(new Error('Não foi possível ler a foto.'))
-        return
-      }
-      ctx.drawImage(img, 0, 0, largura, altura)
-      const foto = canvas.toDataURL('image/jpeg', 0.72)
-      if (foto.length > 400_000) {
-        reject(new Error('A foto ficou grande demais. Escolha outra imagem.'))
-        return
-      }
-      resolve(foto)
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error('Não foi possível ler a foto.'))
-    }
-    img.src = url
-  })
 }

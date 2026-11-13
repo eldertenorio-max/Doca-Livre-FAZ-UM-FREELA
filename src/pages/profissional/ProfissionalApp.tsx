@@ -19,7 +19,8 @@ import { validarChavePix } from '../../lib/pix'
 import { useStore } from '../../lib/store'
 import type { CandidaturaStatus, Disponibilidade } from '../../lib/types'
 import { PerfilEmpresa, logoDaEmpresa } from './PerfilEmpresa'
-import { EditorPerfil, lerFotoPerfil } from './EditorPerfil'
+import { EditorPerfil } from './EditorPerfil'
+import { useFotoPerfil } from './fotoPerfil'
 import { useLocalizacaoAparelho } from './useLocalizacaoAparelho'
 import { SinoTrabalhador } from './SinoTrabalhador'
 import '../empresa/contratar.css'
@@ -47,6 +48,7 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
   const [menuFixo, setMenuFixo] = useState(false)
   const [menuHover, setMenuHover] = useState(false)
   const [telaEstreita, setTelaEstreita] = useState(false)
+  const fotoPerfil = useFotoPerfil(prof?.id)
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 860px)')
@@ -132,7 +134,7 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
                 },
               ],
               onIrPainel: () => setTab('inicio'),
-              editar: { rotulo: prof.foto ? 'Alterar foto' : 'Adicionar foto', onClick: () => setTab('perfil') },
+              fotoAcoes: { temFoto: Boolean(prof.foto), trocar: fotoPerfil.trocar, remover: fotoPerfil.remover },
               onSair: onLogout,
             }}
           />
@@ -183,7 +185,7 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
             {tab === 'vagas' && <VagasTab />}
             {tab === 'agenda' && <AgendaTab />}
             {tab === 'financeiro' && <FinanceiroTab />}
-            {tab === 'perfil' && <PerfilTab />}
+            {tab === 'perfil' && <PerfilTab onTrocarFoto={fotoPerfil.trocar} />}
             {tab === 'opcoes' && <OpcoesTab onIr={setTab} />}
             {tab === 'aplicativo' && <AplicativoCelular papel="profissional" />}
           </div>
@@ -193,6 +195,7 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
         <PecaViewer pecaId={termoId} papel="trabalhador" nome={prof.nome} onClose={() => setTermoId(null)} />
       )}
       <AceiteTermosGate onSair={onLogout} />
+      {fotoPerfil.elementos}
     </div>
   )
 }
@@ -1155,43 +1158,24 @@ function OpcoesTab({ onIr }: { onIr: (aba: TabId) => void }) {
   )
 }
 
-function PerfilTab() {
+function PerfilTab({ onTrocarFoto }: { onTrocarFoto: () => void }) {
   const { currentProfissional } = useStore()
   const prof = currentProfissional!
   const [docsOpen, setDocsOpen] = useState(false)
   const [editando, setEditando] = useState(false)
-  const [fotoAoVivo, setFotoAoVivo] = useState<string | undefined>()
-  const [erroFoto, setErroFoto] = useState('')
   const [salvo, setSalvo] = useState(false)
-  const arquivoRef = useRef<HTMLInputElement>(null)
   const [slide, setSlide] = useState(0)
   const toque = useRef({ x: 0, y: 0 })
   const idade = idadeDe(prof.nascimento)
   const cargo = prof.profissoes[0] ? cargoLabel(prof.profissoes[0]) : 'Trabalhador'
   const nota = prof.avaliacaoMedia.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
   const turnos = TURNOS.filter((item) => prof.disponibilidade[item.key])
-  const fotoCapa = editando && fotoAoVivo ? fotoAoVivo : prof.foto
+  const fotoCapa = prof.foto
 
   function pararToque(event: ReactPointerEvent<HTMLButtonElement>) {
     event.stopPropagation()
   }
 
-  function abrirFoto() {
-    setSalvo(false)
-    setErroFoto('')
-    setEditando(true)
-    arquivoRef.current?.click()
-  }
-
-  async function escolherFoto(file: File | undefined) {
-    if (!file) return
-    try {
-      setFotoAoVivo(await lerFotoPerfil(file))
-      setErroFoto('')
-    } catch (falha) {
-      setErroFoto(falha instanceof Error ? falha.message : 'Não foi possível ler a foto.')
-    }
-  }
 
   const slides = useMemo(() => {
     const itens: { id: string; node: ReactNode }[] = [
@@ -1288,16 +1272,6 @@ function PerfilTab() {
 
   return (
     <div className="td-page">
-      <input
-        ref={arquivoRef}
-        className="td-arquivo"
-        type="file"
-        accept="image/jpeg,image/png,image/webp"
-        onChange={(e) => {
-          void escolherFoto(e.target.files?.[0])
-          e.target.value = ''
-        }}
-      />
       <article
         className="td-hero"
         onPointerDown={(event) => {
@@ -1317,22 +1291,24 @@ function PerfilTab() {
             </div>
           ))}
         </div>
-        {slide === 0 && (
+        {slide === 0 && !editando && (
           <button
             type="button"
             className="td-foto-btn"
             onPointerDown={pararToque}
             onPointerUp={pararToque}
-            onClick={abrirFoto}
+            onClick={() => {
+              setSalvo(false)
+              onTrocarFoto()
+            }}
           >
-            Trocar foto
+            {prof.foto ? 'Trocar foto' : 'Adicionar foto'}
           </button>
         )}
       </article>
 
       <div className="td-painel">
       {salvo && !editando && <p className="docs-ok">Perfil atualizado.</p>}
-      {erroFoto && <p className="error">{erroFoto}</p>}
       {!editando && (
         <button
           type="button"
@@ -1348,14 +1324,9 @@ function PerfilTab() {
       {editando ? (
         <EditorPerfil
           prof={prof}
-          fotoNova={fotoAoVivo}
-          onFechar={() => {
-            setEditando(false)
-            setFotoAoVivo(undefined)
-          }}
+          onFechar={() => setEditando(false)}
           onSalvou={() => {
             setEditando(false)
-            setFotoAoVivo(undefined)
             setSalvo(true)
           }}
         />

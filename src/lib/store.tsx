@@ -424,6 +424,8 @@ type StoreApi = {
     profissionalId: string,
     pix: string,
   ) => { ok: true; chave: string; rotulo: string } | { ok: false; error: string }
+  /** Troca (foto) ou remove (sem foto) a foto de perfil, sem mexer no resto do perfil. */
+  atualizarFotoProfissional: (profissionalId: string, foto?: string) => { ok: boolean; error?: string }
   toggleFavorito: (empresaId: string, profissionalId: string) => void
   toggleBloqueado: (empresaId: string, profissionalId: string) => void
   setEmpresaStatus: (id: string, status: Empresa['status'], opts?: { motivoRecusa?: string }) => Promise<{ ok: boolean; error?: string }>
@@ -1719,7 +1721,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                 rg: dados.rg.trim(),
                 nascimento: dados.nascimento,
                 telefone: dados.telefone.trim(),
-                foto: dados.foto || p.foto,
+                // undefined = não mexeu; '' = removeu a foto.
+                foto: dados.foto === undefined ? p.foto : dados.foto || undefined,
                 resumo: dados.resumo === undefined ? p.resumo : semContato(dados.resumo).slice(0, 600) || undefined,
                 escolaridade: dados.escolaridade === undefined ? p.escolaridade : dados.escolaridade || undefined,
                 habilidades:
@@ -1747,6 +1750,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
               }
             : p,
         ),
+      }))
+      return { ok: true }
+    },
+
+    atualizarFotoProfissional(profissionalId, foto) {
+      if (!state.profissionais.some((p) => p.id === profissionalId)) {
+        return { ok: false, error: 'Perfil não encontrado.' }
+      }
+      if (foto && (!foto.startsWith('data:image/') || foto.length > 400_000)) {
+        return { ok: false, error: 'A foto ficou grande demais. Escolha outra imagem.' }
+      }
+      update((s) => ({
+        ...s,
+        profissionais: s.profissionais.map((p) => (p.id === profissionalId ? { ...p, foto: foto || undefined } : p)),
       }))
       return { ok: true }
     },

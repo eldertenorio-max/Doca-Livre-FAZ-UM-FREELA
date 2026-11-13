@@ -120,6 +120,8 @@ export type PerfilDoTopo = {
   onIrPainel: () => void
   /** Ex.: "Editar perfil" leva para a aba de perfil do portal. */
   editar?: { rotulo: string; onClick: () => void }
+  /** Foto de perfil direto no painel: adicionar, trocar ou remover (no lugar de "editar"). */
+  fotoAcoes?: { temFoto: boolean; trocar: () => void; remover: () => void }
   onSair: () => void
 }
 
@@ -205,10 +207,23 @@ export function UsuarioTopo({ perfil }: { perfil: PerfilDoTopo }) {
                 <span className="dl-perfil-hero-texto">
                   <strong>{perfil.nome}</strong>
                   <span>{perfil.papel}</span>
-                  {perfil.editar && (
-                    <button type="button" className="dl-perfil-acao-foto" onClick={() => ir(perfil.editar!.onClick)}>
-                      {perfil.editar.rotulo}
-                    </button>
+                  {perfil.fotoAcoes ? (
+                    <span className="dl-perfil-acoes-foto">
+                      <button type="button" className="dl-perfil-acao-foto" onClick={() => ir(perfil.fotoAcoes!.trocar)}>
+                        {perfil.fotoAcoes.temFoto ? 'Trocar foto' : 'Adicionar foto'}
+                      </button>
+                      {perfil.fotoAcoes.temFoto && (
+                        <button type="button" className="dl-perfil-acao-foto dl-perfil-acao-foto--remover" onClick={() => ir(perfil.fotoAcoes!.remover)}>
+                          Remover foto
+                        </button>
+                      )}
+                    </span>
+                  ) : (
+                    perfil.editar && (
+                      <button type="button" className="dl-perfil-acao-foto" onClick={() => ir(perfil.editar!.onClick)}>
+                        {perfil.editar.rotulo}
+                      </button>
+                    )
                   )}
                 </span>
               </div>
