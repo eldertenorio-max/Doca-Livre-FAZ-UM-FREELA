@@ -20,6 +20,7 @@ import { enviarCodigoEmail } from './server-functions/enviarCodigoEmail.mjs'
 import { notificarCadastro } from './server-functions/notificarCadastro.mjs'
 import { analisarDocumentoCadastro } from './server-functions/analisarDocumentoCadastro.mjs'
 import { lerCurriculo } from './server-functions/lerCurriculo.mjs'
+import { instalarCapturaGlobal, observarResposta } from './control-center.mjs'
 
 const port = Number(process.env.PORT || 8080)
 
@@ -39,6 +40,23 @@ const tabelas = [
   'mao_registros',
 ]
 const copiaPermitida = new Set(tabelas)
+// Nomes das telas/áreas nos avisos do Control Center (ação que falhou).
+const rotulos = {
+  mao_usuarios: 'Usuários',
+  mao_email_codigos: 'Códigos de e-mail',
+  mao_permissoes: 'Permissões',
+  mao_hierarquia_niveis: 'Hierarquia (níveis)',
+  mao_org_nos: 'Hierarquia (estrutura)',
+  mao_grupos_hierarquia: 'Grupos de hierarquia',
+  mao_grupos_hierarquia_membros: 'Membros dos grupos',
+  mao_app_state: 'Estado do app',
+  mao_contas: 'Contas',
+  mao_profissionais: 'Profissionais',
+  mao_empresas: 'Empresas',
+  mao_documentos: 'Documentos',
+  mao_registros: 'Registros',
+}
+instalarCapturaGlobal()
 
 function lerCorpo(req, limite = 10_000_000) {
   return new Promise((resolve, reject) => {
@@ -185,7 +203,7 @@ async function contagens() {
  * PostgREST. Fica de fora o "details" (traz os valores da linha) e qualquer dado enviado.
  * Sem isso, um cadastro recusado não deixava rastro nenhum no servidor.
  */
-function registrarRecusa(req, alvo, up) {
+function registrarRecusa(req, alvo, up, res) {
   const partes = []
   let total = 0
   up.on('data', (p) => {
@@ -206,6 +224,8 @@ function registrarRecusa(req, alvo, up) {
     console.error(
       `[rest] ${req.method} ${alvo.pathname} ${up.statusCode} ${quem} ${codigo} ${String(mensagem).slice(0, 200)}`.trim(),
     )
+    // Erro do servidor de dados: a mensagem segue para o aviso do Control Center.
+    if ((up.statusCode || 0) >= 500 && res) res.erroDetalhe = `${codigo} ${String(mensagem).slice(0, 200)}`.trim()
   })
 }
 
@@ -219,10 +239,11 @@ function encaminhar(req, res, base, caminho) {
   const pre = lib.request(alvo, { method: req.method, headers }, (up) => {
     const saida = { ...up.headers, ...cors(req.headers.origin) }
     res.writeHead(up.statusCode || 502, saida)
-    if ((up.statusCode || 502) >= 400) registrarRecusa(req, alvo, up)
+    if ((up.statusCode || 502) >= 400) registrarRecusa(req, alvo, up, res)
     up.pipe(res)
   })
   pre.on('error', () => {
+    res.erroDetalhe = 'O serviço de dados (PostgREST) não respondeu'
     if (!res.headersSent) res.writeHead(502, { 'content-type': 'application/json' })
     res.end(JSON.stringify({ ok: false, erro: 'Falha ao encaminhar PostgREST' }))
   })
@@ -236,6 +257,7 @@ async function rotaJson(req, res, limite, executar, falha) {
     const resultado = await executar(corpo)
     const status = resultado.status || (resultado.ok ? 200 : 503)
     if (!resultado.ok) console.error(`[rota] ${req.method} ${req.url?.split('?')[0]} ${status} ${String(resultado.erro || '').slice(0, 160)}`)
+    if (!resultado.ok && status >= 500) res.erroDetalhe = String(resultado.erro || '').slice(0, 300)
     responder(req, res, status, semStatus(resultado))
   } catch (erro) {
     console.error('[rota]', req.url, erro?.message || erro)
@@ -244,6 +266,7 @@ async function rotaJson(req, res, limite, executar, falha) {
 }
 
 const server = http.createServer(async (req, res) => {
+  observarResposta(req, res, rotulos)
   const url = new URL(req.url || '/', 'http://local')
   const caminho = url.pathname
 
@@ -301,6 +324,7 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ ok: true, tabela, gravadas }))
     } catch (erro) {
       const mensagem = erro instanceof Error ? erro.message : 'Falha ao gravar'
+      res.erroDetalhe = mensagem
       res.writeHead(500, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ ok: false, erro: mensagem }))
     }
@@ -485,6 +509,7 @@ const server = http.createServer(async (req, res) => {
       await atenderArquivo(req, res, caminho)
     } catch (e) {
       console.error('[storage error]', e)
+      res.erroDetalhe = e instanceof Error ? e.message : 'Falha no arquivo'
       if (!res.headersSent) res.writeHead(500, { 'content-type': 'application/json' })
       res.end(JSON.stringify({ message: 'Falha no arquivo' }))
     }

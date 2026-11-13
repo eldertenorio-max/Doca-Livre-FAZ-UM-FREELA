@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
 import { segredoJwt } from './auth.mjs'
+import { reportarErro } from './control-center.mjs'
 
 const senha = encodeURIComponent(process.env.PGPASSWORD || '')
 const ssl = process.env.PGSSL === 'off' ? 'disable' : 'require'
@@ -24,6 +25,15 @@ try {
 const postgrest = spawn(process.env.POSTGREST_BIN || '/usr/local/bin/postgrest', [], { stdio: 'inherit' })
 postgrest.on('exit', (codigo) => {
   console.error(`postgrest encerrou ${codigo}`)
+  // Sem o PostgREST nenhuma tela de dados funciona, mesmo com a rota de saúde respondendo.
+  reportarErro({
+    nivel: 'critical',
+    titulo: 'O serviço de dados (PostgREST) parou',
+    mensagem: `O PostgREST encerrou com código ${codigo}; as telas que leem ou gravam dados deixam de funcionar.`,
+    acao: 'Serviço de dados',
+    tela: 'Servidor',
+    chave: 'postgrest-exit',
+  })
 })
 
 await import('./server.js')
