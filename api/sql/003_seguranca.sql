@@ -341,11 +341,12 @@ create policy fz_emp_ver on mao_empresas for select to web
   using (fz_admin() or user_id = fz_uid());
 
 -- Profissionais aprovados, para quem tem empresa: sem CPF, RG, telefone, nascimento (vai a
--- idade), endereço (vão cidade/UF e coordenada aproximada), PIX, banco, saldo, foto.
+-- idade), endereço (vão cidade/UF e coordenada aproximada), PIX, banco e saldo. A foto de perfil
+-- vai (opcional; o trabalhador é avisado ao colocar e a política de privacidade cita).
 create or replace view mao_profissionais_vitrine with (security_barrier = true) as
   select p.id, p.user_id, p.status,
     (p.payload - 'cpf' - 'rg' - 'telefone' - 'nascimento' - 'pix' - 'banco' - 'saldo' - 'ganhosMes'
-      - 'consentimentoPrivacidade' - 'foto' - 'endereco' - 'motivoRecusa')
+      - 'consentimentoPrivacidade' - 'endereco' - 'motivoRecusa')
       || jsonb_build_object(
         'idade', fz_idade(p.payload ->> 'nascimento'),
         'endereco', jsonb_build_object(
