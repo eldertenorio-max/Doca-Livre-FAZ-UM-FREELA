@@ -202,7 +202,10 @@ export function RecorteFoto({
     >
       <div className="recorte-janela" role="dialog" aria-modal="true" aria-labelledby="recorte-titulo">
         <h2 id="recorte-titulo">Ajustar foto de perfil</h2>
-        <p className="recorte-dica">Arraste a foto para encaixar o rosto no círculo. Use o zoom para aproximar.</p>
+        <p className="recorte-dica">
+          Arraste a foto para encaixar o rosto no círculo. Use o zoom para aproximar. A foto aparece para as empresas no
+          seu perfil, na busca e no mapa.
+        </p>
         <div
           ref={quadroRef}
           className="recorte-quadro"

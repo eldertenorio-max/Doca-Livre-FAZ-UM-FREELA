@@ -1678,6 +1678,14 @@ button.cf-vaga-nome:disabled {
   justify-content: center;
   letter-spacing: 0.04em;
   box-shadow: inset 0 0 0 3px rgb(255 255 255 / 0.35);
+  overflow: hidden;
+  flex: none;
+}
+
+.cf-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .cf-pro-id h3 {

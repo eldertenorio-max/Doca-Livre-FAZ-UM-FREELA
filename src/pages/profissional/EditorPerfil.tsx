@@ -311,8 +311,8 @@ export function EditorPerfil({
           </div>
         </div>
         <p className="td-editor-resumo">
-          Use uma foto do rosto, de frente e com boa luz. Depois de escolher, você ajusta o enquadramento. Vale quando
-          tocar em Salvar perfil.
+          Use uma foto do rosto, de frente e com boa luz. Depois de escolher, você ajusta o enquadramento. A foto aparece
+          para as empresas no seu perfil, na busca e no mapa. Vale quando tocar em Salvar perfil.
         </p>
         {erroFoto && <p className="error">{erroFoto}</p>}
         <input

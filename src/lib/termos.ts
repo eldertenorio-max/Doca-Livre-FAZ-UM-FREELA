@@ -30,7 +30,7 @@ const TERMOS: Record<TermoId, TermoPlataforma> = {
     rotuloAceite: 'Li e concordo com a Política de privacidade.',
     paragrafos: [
       'Os dados pessoais são tratados conforme a Lei 13.709/2018 (LGPD), para cadastro, seleção, contratação, pagamento, segurança e cumprimento de obrigações legais.',
-      'A empresa tomadora recebe do trabalhador o necessário para a missão: nome, idade, cidade, cargos, experiência, certificações, categoria da CNH, disponibilidade e avaliação. CPF, RG, telefone, endereço e dados bancários ficam com a fazumfreela.',
+      'A empresa tomadora recebe do trabalhador o necessário para a missão: nome, idade, cidade, cargos, experiência, certificações, categoria da CNH, disponibilidade, avaliação e a foto de perfil, se o trabalhador colocar uma. CPF, RG, telefone, endereço e dados bancários ficam com a fazumfreela.',
       'O titular pode pedir acesso, correção ou exclusão dos dados. Alguns registros ficam guardados pelo prazo que a lei trabalhista e fiscal exige.',
     ],
   },

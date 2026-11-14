@@ -2977,7 +2977,7 @@ function PessoaCard({
     <article className={`cf-pro ${bloqueado ? 'cf-pro--blocked' : item.atendeObrigatorios ? 'cf-pro--fit' : 'cf-pro--aside'}`}>
       <div className="cf-pro-top">
         <div className="cf-avatar" style={{ background: corAvatar(p.id) }} aria-hidden>
-          {iniciais(p.nome)}
+          {p.foto ? <img src={p.foto} alt="" /> : iniciais(p.nome)}
         </div>
         <div className="cf-pro-id">
           <h3>{p.nome}</h3>
