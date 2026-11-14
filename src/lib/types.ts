@@ -46,6 +46,8 @@ export type Endereco = {
   numero: string
   /** Apto, bloco, casa 2... Fica só com a pessoa e a gestão (a empresa vê só cidade e UF). */
   complemento?: string
+  /** De onde veio lat/lng: rua (OpenStreetMap), CEP, centro da cidade ou marcador arrastado. O servidor recalcula cidade/CEP. */
+  coordOrigem?: 'endereco' | 'cep' | 'cidade' | 'manual'
   cidade: string
   estado: string
   lat: number

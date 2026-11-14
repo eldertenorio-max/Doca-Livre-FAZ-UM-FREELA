@@ -79,4 +79,6 @@ export async function preparar() {
   } catch {
     /* ignore se pgrst nao estiver escutando ainda */
   }
+  // Em segundo plano (não segura a subida): posição de quem ainda está no centro da cidade, pelo endereço.
+  void import('./localizacao.mjs').then((m) => m.atualizarLocalizacoes()).catch((erro) => console.error('[localizacao]', erro?.message || erro))
 }
