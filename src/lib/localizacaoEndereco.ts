@@ -12,6 +12,13 @@ export type OrigemPonto = 'manual' | 'salvo' | 'endereco' | 'cep' | 'cidade'
 
 export type EnderecoParaMapa = { rua: string; numero: string; cidade: string; estado: string }
 
+/** Origem que fica gravada no endereço (o ponto salvo mantém a origem de quando foi gravado). */
+export function origemParaGravar(origem: OrigemPonto | null, salva?: 'endereco' | 'cep' | 'cidade' | 'manual') {
+  if (origem === 'salvo') return salva
+  if (origem === 'manual' || origem === 'endereco' || origem === 'cep') return origem
+  return 'cidade' as const
+}
+
 export function pontoValido(ponto: Partial<Ponto> | null | undefined): ponto is Ponto {
   return Boolean(
     ponto &&

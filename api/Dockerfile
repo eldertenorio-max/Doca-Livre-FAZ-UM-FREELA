@@ -6,7 +6,7 @@ RUN apk add --no-cache xz curl \
 WORKDIR /app
 COPY package.json ./
 RUN npm install --omit=dev
-COPY server.js migrar.mjs arquivos.mjs start.mjs auth.mjs rotasAuth.mjs email.mjs aplicativo.mjs ./
+COPY server.js migrar.mjs arquivos.mjs start.mjs auth.mjs rotasAuth.mjs email.mjs aplicativo.mjs localizacao.mjs ./
 COPY sql ./sql
 COPY server-functions ./server-functions
 ENV PORT=8080

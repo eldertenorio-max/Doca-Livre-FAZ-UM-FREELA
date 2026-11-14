@@ -7,7 +7,7 @@ import { RecorteFoto, carregarFotoParaRecorte } from '../../components/RecorteFo
 import { CATEGORIES, cargoLabel } from '../../data/categories'
 import { LOCAIS_OPERACAO } from '../../data/cidades'
 import { coordenadaDaCidade } from '../../lib/coordenadaCidade'
-import { chaveDoEndereco, pontoValido, useLocalizacaoEndereco } from '../../lib/localizacaoEndereco'
+import { chaveDoEndereco, origemParaGravar, pontoValido, useLocalizacaoEndereco } from '../../lib/localizacaoEndereco'
 import { hojeLocal } from '../../lib/ponto'
 import { CERTIFICADOS_COMUNS, habilidadesDoTexto, mesclarCurriculo, nomeCertificado } from '../../lib/curriculo'
 import type { LeituraCurriculo } from '../../lib/lerCurriculo'
@@ -268,6 +268,7 @@ export function EditorPerfil({
         rua: form.rua,
         numero: form.numero,
         complemento: form.complemento.trim() || undefined,
+        coordOrigem: localizacao.ponto ? origemParaGravar(localizacao.origem, prof.endereco.coordOrigem) : prof.endereco.coordOrigem,
         cidade: form.cidade,
         estado: form.estado,
         ...coordenada,

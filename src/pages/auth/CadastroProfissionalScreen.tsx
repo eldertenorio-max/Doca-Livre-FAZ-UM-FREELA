@@ -9,7 +9,7 @@ import { AnexoCurriculo, CamposSobre, ListaExperiencias, conferirExperiencias } 
 import type { TermoId } from '../../lib/termos'
 import { ACCEPT_DOCUMENTO_CADASTRO, lerArquivoCadastro, type FotoDocumento, type PapelDocumento } from '../../lib/analisarDocumentoCadastro'
 import { coordenadaDaCidade } from '../../lib/coordenadaCidade'
-import { pontoValido, useLocalizacaoEndereco } from '../../lib/localizacaoEndereco'
+import { origemParaGravar, pontoValido, useLocalizacaoEndereco } from '../../lib/localizacaoEndereco'
 import { hojeLocal } from '../../lib/ponto'
 import { CERTIFICADOS_COMUNS, habilidadesDoTexto, mesclarCurriculo, nomeCertificado, semContato } from '../../lib/curriculo'
 import type { LeituraCurriculo } from '../../lib/lerCurriculo'
@@ -435,6 +435,7 @@ export function CadastroProfissionalScreen({ onBack, onDone }: Props) {
         rua: form.rua,
         numero: form.numero,
         complemento: form.complemento.trim() || undefined,
+        coordOrigem: origemParaGravar(localizacao.origem),
         cidade: form.cidade.trim(),
         estado: form.estado.trim().toUpperCase(),
         ...(localizacao.ponto ??
