@@ -73,7 +73,9 @@ async function novoCC(cfg = {}) {
   }
 }
 
-/** Cria um enviador apontado para o CC falso, com a fonte de usuários injetada. */
+const BALDE = '2026111810' // hora fixa nos testes: sem instabilidade na virada da hora
+
+/** Cria um enviador apontado para o CC falso, com a fonte de usuários injetada e a hora fixa. */
 function criar(cc, consultar, extra = {}) {
   const logs = []
   const r = mod.criarRetratoUsuarios({
@@ -81,6 +83,7 @@ function criar(cc, consultar, extra = {}) {
     slug: 'freela',
     segredo: SEGREDO,
     consultar,
+    balde: () => BALDE,
     pausaMs: 5,
     timeoutPrimeiraMs: 2000,
     timeoutDemaisMs: 2000,
@@ -146,7 +149,7 @@ test('papel: super, admin, empresa e profissional; qualquer outro valor vira pro
   assert.equal(mod.mapearPapel(undefined), 'profissional')
 })
 
-test('payload do usuário: campos pedidos, ativo sem status, nome com alternativas', () => {
+test('payload do usuário: campos pedidos, ativo com status "offline", nome com alternativas', () => {
   assert.deepEqual(mod.montarPayloadUsuario(linha(1)), {
     external_id: '1',
     name: 'Pessoa 1',
@@ -154,8 +157,8 @@ test('payload do usuário: campos pedidos, ativo sem status, nome com alternativ
     email: 'usuario1@exemplo.com',
     username: 'usuario1',
     created_at: '2026-01-02T03:04:05.000Z',
+    status: 'offline',
   })
-  assert.equal('status' in mod.montarPayloadUsuario(linha(1)), false)
   // empresa: nome fantasia, depois razão social
   assert.equal(mod.montarPayloadUsuario(linha(2, { role: 'empresa', prof_nome: null, emp_fantasia: 'Loja X', emp_razao: 'Loja X Ltda' })).name, 'Loja X')
   assert.equal(mod.montarPayloadUsuario(linha(3, { role: 'empresa', prof_nome: null, emp_razao: 'Loja Y Ltda' })).name, 'Loja Y Ltda')
@@ -170,14 +173,38 @@ test('payload do usuário: campos pedidos, ativo sem status, nome com alternativ
   assert.equal(mod.montarPayloadUsuario(null), null)
 })
 
-test('inativo ou perfil bloqueado vira status "blocked"; pendente e recusado não', () => {
+test('inativo ou perfil bloqueado vira "blocked"; ativo (inclusive pendente e recusado) vira "offline"', () => {
   assert.equal(mod.montarPayloadUsuario(linha(1, { ativo: false })).status, 'blocked')
   assert.equal(mod.montarPayloadUsuario(linha(2, { prof_status: 'bloqueado' })).status, 'blocked')
   assert.equal(mod.montarPayloadUsuario(linha(3, { role: 'empresa', emp_status: 'bloqueada' })).status, 'blocked')
   for (const s of ['pendente', 'aprovado', 'recusado']) {
-    assert.equal('status' in mod.montarPayloadUsuario(linha(4, { prof_status: s })), false, s)
+    assert.equal(mod.montarPayloadUsuario(linha(4, { prof_status: s })).status, 'offline', s)
   }
-  assert.equal('status' in mod.montarPayloadUsuario(linha(5, { emp_status: 'aprovada' })), false)
+  assert.equal(mod.montarPayloadUsuario(linha(5, { emp_status: 'aprovada' })).status, 'offline')
+})
+
+test('status só pode ser "blocked" ou "offline": nunca "online" nem "never"', () => {
+  const variacoes = [
+    {},
+    { ativo: false },
+    { ativo: null },
+    { ativo: undefined },
+    { prof_status: 'bloqueado' },
+    { prof_status: 'aprovado', emp_status: 'aprovada' },
+    { role: 'admin' },
+    { role: 'estranho' },
+  ]
+  for (const v of variacoes) {
+    const st = mod.montarPayloadUsuario(linha(1, v)).status
+    assert.ok(st === 'blocked' || st === 'offline', JSON.stringify(v))
+  }
+})
+
+test('hash do payload muda entre bloqueado e ativo (o desbloqueio vira um evento diferente)', () => {
+  const bloqueado = mod.montarPayloadUsuario(linha(1, { ativo: false }))
+  const ativo = mod.montarPayloadUsuario(linha(1, { ativo: true }))
+  assert.notEqual(mod.hashPayload(bloqueado), mod.hashPayload(ativo))
+  assert.notEqual(mod.chaveIdempotencia('freela', '1', bloqueado, BALDE), mod.chaveIdempotencia('freela', '1', ativo, BALDE))
 })
 
 test('campos sensíveis NUNCA entram no payload, mesmo que a linha os traga', () => {
@@ -218,14 +245,36 @@ test('a consulta é um único SELECT, sem colunas sensíveis e sem escrita', () 
   assert.equal(mod.LIMITE_USUARIOS, 2000)
 })
 
-test('canônico, hash e chave de idempotência: ordem das chaves não importa e o formato é snap:slug:id:sha1[:12]', () => {
+test('canônico e hash do payload: a ordem das chaves não importa; sha1[:12]', () => {
   const a = { external_id: '9', name: 'Ana', role_code: 'profissional' }
   const b = { role_code: 'profissional', name: 'Ana', external_id: '9' }
   assert.equal(mod.canonizar(a), mod.canonizar(b))
   assert.equal(mod.hashPayload(a), mod.hashPayload(b))
   assert.equal(mod.hashPayload(a), createHash('sha1').update('{"external_id":"9","name":"Ana","role_code":"profissional"}').digest('hex').slice(0, 12))
-  assert.match(mod.chaveIdempotencia('freela', '9', a), /^snap:freela:9:[0-9a-f]{12}$/)
   assert.notEqual(mod.hashPayload(a), mod.hashPayload({ ...a, name: 'Ana Maria' }))
+})
+
+test('balde por hora em UTC (AAAAMMDDHH): zeros à esquerda e virada de hora, dia e ano', () => {
+  assert.equal(mod.baldeHoraUtc(new Date('2026-11-18T22:03:53Z')), '2026111822')
+  assert.equal(mod.baldeHoraUtc(new Date('2026-01-02T03:04:05Z')), '2026010203')
+  assert.equal(mod.baldeHoraUtc(new Date('2026-11-18T22:59:59.999Z')), '2026111822')
+  assert.equal(mod.baldeHoraUtc(new Date('2026-11-18T23:00:00.000Z')), '2026111823')
+  assert.equal(mod.baldeHoraUtc(new Date('2026-12-31T23:59:59.999Z')), '2026123123')
+  assert.equal(mod.baldeHoraUtc(new Date('2027-01-01T00:00:00.000Z')), '2027010100')
+  // é UTC, não a hora local: -03:00 às 21h local = 00h UTC do dia seguinte
+  assert.equal(mod.baldeHoraUtc(new Date('2026-11-18T21:00:00-03:00')), '2026111900')
+  assert.match(mod.baldeHoraUtc(), /^\d{10}$/)
+})
+
+test('chave de idempotência: snap:slug:id:sha1[:12][-rN]:AAAAMMDDHH e, na remoção, snap:slug:id:deleted[-rN]:AAAAMMDDHH', () => {
+  const a = { external_id: '9', name: 'Ana', role_code: 'profissional', status: 'offline' }
+  const hash = mod.hashPayload(a)
+  assert.equal(mod.chaveIdempotencia('freela', '9', a, '2026111810'), `snap:freela:9:${hash}:2026111810`)
+  assert.equal(mod.chaveIdempotencia('freela', '9', a, '2026111810', 2), `snap:freela:9:${hash}-r2:2026111810`)
+  assert.equal(mod.chaveExclusao('freela', '9', '2026111810'), 'snap:freela:9:deleted:2026111810')
+  assert.equal(mod.chaveExclusao('freela', '9', '2026111810', 1), 'snap:freela:9:deleted-r1:2026111810')
+  assert.match(mod.chaveIdempotencia('freela', '9', a), /^snap:freela:9:[0-9a-f]{12}:\d{10}$/, 'sem balde informado usa a hora UTC atual')
+  assert.notEqual(mod.chaveIdempotencia('freela', '9', a, '2026111810'), mod.chaveIdempotencia('freela', '9', a, '2026111811'))
 })
 
 test('intervalo: padrão 10 minutos, mínimo 2, nunca passa de 1 dia', () => {
@@ -260,7 +309,8 @@ test('envia user.updated assinado (HMAC) no formato do Control Center, um por ve
       assert.equal(rec.corpo.event_type, 'user.updated')
       assert.equal(rec.corpo.system_slug, 'freela')
       assert.equal(rec.corpo.idempotency_key, rec.headers['x-doca-idempotency-key'])
-      assert.match(rec.corpo.idempotency_key, /^snap:freela:\d+:[0-9a-f]{12}$/)
+      assert.match(rec.corpo.idempotency_key, /^snap:freela:\d+:[0-9a-f]{12}:2026111810$/)
+      assert.equal(rec.corpo.payload.status, 'offline')
       assert.equal(new Date(rec.corpo.occurred_at).toISOString(), rec.corpo.occurred_at)
     }
     assert.deepEqual(cc.recebidos.map((x) => x.corpo.payload.external_id), ['1', '2', '3'])
@@ -295,15 +345,16 @@ test('o que sai do sistema não contém campo sensível (corpo bruto inteiro)', 
   }
 })
 
-test('inativo vai com status "blocked"; ativo vai SEM o campo status', async () => {
+test('inativo vai com status "blocked"; ativo vai com "offline" (nunca "online" nem "never")', async () => {
   const cc = await novoCC()
   try {
     const { r } = criar(cc, async () => [linha(1), linha(2, { ativo: false }), linha(3, { prof_status: 'bloqueado' })])
     await r.executarCiclo()
     const porId = Object.fromEntries(cc.recebidos.map((x) => [x.corpo.payload.external_id, x.corpo.payload]))
-    assert.equal('status' in porId['1'], false)
+    assert.equal(porId['1'].status, 'offline')
     assert.equal(porId['2'].status, 'blocked')
     assert.equal(porId['3'].status, 'blocked')
+    for (const rec of cc.recebidos) assert.ok(['blocked', 'offline'].includes(rec.corpo.payload.status))
   } finally {
     await cc.fechar()
   }
@@ -324,7 +375,7 @@ test('quem sumiu desde o ciclo anterior recebe user.deleted (uma vez só)', asyn
     assert.equal(apagados.length, 1)
     assert.deepEqual(apagados[0].corpo.payload, { external_id: '2' })
     assert.ok(assinaturaConfere(apagados[0]))
-    assert.match(apagados[0].corpo.idempotency_key, /^snap:freela:2:[0-9a-f]{12}$/)
+    assert.equal(apagados[0].corpo.idempotency_key, 'snap:freela:2:deleted:2026111810')
     assert.equal(res.excluidos, 1)
     assert.match(logs.at(-1), /1 removidos/)
     // ciclo seguinte: já foi, não repete
@@ -350,8 +401,47 @@ test('user.deleted que falhou na entrega é repetido no ciclo seguinte (mesma ch
     const res = await r.executarCiclo()
     const todas = cc.recebidos.filter((x) => x.corpo.event_type === 'user.deleted')
     assert.equal(todas.length, 2)
-    assert.equal(todas[1].corpo.idempotency_key, todas[0].corpo.idempotency_key)
+    assert.equal(todas[1].corpo.idempotency_key, todas[0].corpo.idempotency_key, 'mesma hora: mesma chave')
     assert.equal(res.excluidos, 1)
+  } finally {
+    await cc.fechar()
+  }
+})
+
+test('user.deleted que continua sem entrega na hora seguinte sai com chave nova (o CC processa de novo)', async () => {
+  const cc = await novoCC({ status: (n, corpo) => (corpo?.event_type === 'user.deleted' ? 500 : 201) })
+  try {
+    let hora = '2026111810'
+    let lista = [linha(1), linha(2)]
+    const { r } = criar(cc, async () => lista, { balde: () => hora })
+    await r.executarCiclo()
+    lista = [linha(1)]
+    await r.executarCiclo() // delete falha
+    hora = '2026111811'
+    cc.config.status = 201
+    const res = await r.executarCiclo()
+    const dels = cc.recebidos.filter((x) => x.corpo.event_type === 'user.deleted').map((x) => x.corpo.idempotency_key)
+    assert.deepEqual(dels, ['snap:freela:2:deleted:2026111810', 'snap:freela:2:deleted:2026111811'])
+    assert.equal(res.excluidos, 1)
+  } finally {
+    await cc.fechar()
+  }
+})
+
+test('usuário que volta e some de novo na mesma hora ganha chave de remoção diferente (-r1)', async () => {
+  const cc = await novoCC()
+  try {
+    let lista = [linha(1), linha(2)]
+    const { r } = criar(cc, async () => lista)
+    await r.executarCiclo()
+    lista = [linha(1)]
+    await r.executarCiclo() // 2 removido
+    lista = [linha(1), linha(2)]
+    await r.executarCiclo() // 2 volta
+    lista = [linha(1)]
+    await r.executarCiclo() // 2 removido de novo
+    const dels = cc.recebidos.filter((x) => x.corpo.event_type === 'user.deleted').map((x) => x.corpo.idempotency_key)
+    assert.deepEqual(dels, ['snap:freela:2:deleted:2026111810', 'snap:freela:2:deleted-r1:2026111810'])
   } finally {
     await cc.fechar()
   }
@@ -419,10 +509,108 @@ test('idempotência: mesma chave quando nada muda, outra quando algo muda, e nov
     const desbloqueado = chavesDe(marca)[0]
     assert.notEqual(bloqueado, ciclo1[0])
     assert.notEqual(desbloqueado, ciclo1[0], 'voltar ao estado antigo NÃO reaproveita a chave (o CC ignoraria o evento)')
-    assert.match(desbloqueado, /^snap:freela:1:[0-9a-f]{12}-r1$/)
+    assert.match(desbloqueado, /^snap:freela:1:[0-9a-f]{12}-r1:2026111810$/)
     marca = cc.recebidos.length
     await r.executarCiclo() // segue desbloqueado: a chave nova continua estável
     assert.equal(chavesDe(marca)[0], desbloqueado)
+  } finally {
+    await cc.fechar()
+  }
+})
+
+test('hora na chave: estável dentro da mesma hora, nova na hora seguinte; todas terminam em :AAAAMMDDHH', async () => {
+  const cc = await novoCC()
+  try {
+    let hora = '2026111810'
+    const lista = [linha(1), linha(2)]
+    const { r } = criar(cc, async () => lista, { balde: () => hora })
+    const chavesDe = (de) => cc.recebidos.slice(de).map((x) => x.corpo.idempotency_key)
+
+    await r.executarCiclo()
+    const h10 = chavesDe(0)
+    for (const k of h10) assert.match(k, /^snap:freela:\d+:[0-9a-f]{12}:2026111810$/)
+
+    let marca = cc.recebidos.length
+    const res = await r.executarCiclo() // mesma hora, nada mudou
+    assert.deepEqual(chavesDe(marca), h10, 'mesma hora e mesmo dado: mesma chave (o CC ignora a repetida)')
+    assert.equal(res.novos, 0)
+
+    hora = '2026111811' // virou a hora, mesmo dado
+    marca = cc.recebidos.length
+    const res2 = await r.executarCiclo()
+    const h11 = chavesDe(marca)
+    for (const k of h11) assert.match(k, /^snap:freela:\d+:[0-9a-f]{12}:2026111811$/)
+    for (let i = 0; i < h10.length; i++) {
+      assert.notEqual(h11[i], h10[i], 'hora seguinte: chave nova mesmo sem mudança de dado')
+      assert.equal(h11[i].replace(/:2026111811$/, ''), h10[i].replace(/:2026111810$/, ''), 'só a hora mudou')
+    }
+    assert.equal(res2.novos, 2, 'o CC processa de novo: divergência reparada em até 1 hora')
+
+    marca = cc.recebidos.length
+    await r.executarCiclo() // segue na mesma hora 11
+    assert.deepEqual(chavesDe(marca), h11)
+  } finally {
+    await cc.fechar()
+  }
+})
+
+test('reinício do processo: na mesma hora repete a chave (sem trabalho a mais); na hora seguinte a chave é nova', async () => {
+  const cc = await novoCC()
+  try {
+    const lista = [linha(1)]
+    const antes = criar(cc, async () => lista).r
+    await antes.executarCiclo()
+    const k0 = cc.recebidos.at(-1).corpo.idempotency_key
+
+    // "reinício": memória nova, mesma hora
+    const depoisMesmaHora = criar(cc, async () => lista).r
+    await depoisMesmaHora.executarCiclo()
+    assert.equal(cc.recebidos.at(-1).corpo.idempotency_key, k0)
+
+    // "reinício" na hora seguinte
+    const depoisOutraHora = criar(cc, async () => lista, { balde: () => '2026111811' }).r
+    await depoisOutraHora.executarCiclo()
+    const k1 = cc.recebidos.at(-1).corpo.idempotency_key
+    assert.notEqual(k1, k0)
+    assert.match(k1, /:2026111811$/)
+  } finally {
+    await cc.fechar()
+  }
+})
+
+test('desbloqueio gera chave diferente do bloqueio (e o payload do desbloqueio traz "offline")', async () => {
+  const cc = await novoCC()
+  try {
+    let lista = [linha(1, { ativo: false })]
+    const { r } = criar(cc, async () => lista)
+    await r.executarCiclo()
+    lista = [linha(1, { ativo: true })]
+    await r.executarCiclo()
+    const [bloqueio, desbloqueio] = cc.recebidos
+    assert.equal(bloqueio.corpo.payload.status, 'blocked')
+    assert.equal(desbloqueio.corpo.payload.status, 'offline')
+    assert.notEqual(desbloqueio.corpo.idempotency_key, bloqueio.corpo.idempotency_key)
+    // mesmo na mesma hora e depois de voltar a bloquear e desbloquear de novo
+    lista = [linha(1, { ativo: false })]
+    await r.executarCiclo()
+    lista = [linha(1, { ativo: true })]
+    await r.executarCiclo()
+    const chaves = cc.recebidos.map((x) => x.corpo.idempotency_key)
+    assert.equal(new Set(chaves).size, 4, 'quatro transições, quatro chaves diferentes')
+  } finally {
+    await cc.fechar()
+  }
+})
+
+test('sem balde injetado usa a hora UTC atual (virada de hora durante o teste tolerada)', async () => {
+  const cc = await novoCC()
+  try {
+    const { r } = criar(cc, async () => [linha(1)], { balde: undefined })
+    const a = mod.baldeHoraUtc()
+    await r.executarCiclo()
+    const b = mod.baldeHoraUtc()
+    const sufixo = cc.recebidos[0].corpo.idempotency_key.split(':').at(-1)
+    assert.ok(sufixo === a || sufixo === b, `${sufixo} deveria ser ${a} (ou ${b})`)
   } finally {
     await cc.fechar()
   }

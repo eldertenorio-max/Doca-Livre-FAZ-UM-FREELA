@@ -19,8 +19,18 @@
 // traz só contagens (nenhum dado de usuário, nenhum segredo).
 //
 // O que sai por usuário (user.updated): external_id, name, email, username, role_code, created_at
-// e, só se estiver bloqueado, status = "blocked". Nada além disso (sem hash de senha, token,
-// telefone, documento, endereço, currículo, foto).
+// e status: "blocked" (conta inativa ou perfil bloqueado) ou "offline" (ativo). O Control Center só
+// muda a situação de quem já existe quando o payload traz `status`; por isso o ativo também leva
+// "offline" (senão quem foi desbloqueado ficaria "bloqueado" no painel). Nunca "online" (o painel
+// não sobrescreve quem está online) nem "never" (o Freela não guarda horário de login: "never"
+// afirmaria que a pessoa nunca entrou). Nada além disso (sem hash de senha, token, telefone,
+// documento, endereço, currículo, foto).
+//
+// Chave de idempotência: snap:{slug}:{id}:{sha1(payload)[:12]}[-rN]:{AAAAMMDDHH} (hora UTC) e, para
+// remoção, snap:{slug}:{id}:deleted[-rN]:{AAAAMMDDHH}. O Control Center guarda as chaves já vistas
+// (até reiniciar) e ignora repetidas. Dentro da mesma hora a chave só muda se o dado mudar; o -rN
+// cobre a volta a um estado antigo dentro da mesma hora; e a hora no fim faz qualquer divergência
+// (inclusive após reinício deste processo) ser reparada em até 1 hora.
 import { createHash, createHmac } from 'node:crypto'
 
 const PAPEIS = new Set(['super', 'admin', 'empresa', 'profissional'])
@@ -80,7 +90,8 @@ export function estaBloqueado(linha) {
 
 /**
  * Linha do banco -> payload do user.updated. Só monta os campos permitidos (qualquer outra coluna
- * que venha na linha é ignorada). Ativo: sem `status`. Devolve null se a linha não tem id.
+ * que venha na linha é ignorada). `status`: "blocked" se bloqueado, senão "offline" (nunca "online"
+ * nem "never": ver o cabeçalho do arquivo). Devolve null se a linha não tem id.
  */
 export function montarPayloadUsuario(linha) {
   if (!linha || typeof linha !== 'object') return null
@@ -101,7 +112,7 @@ export function montarPayloadUsuario(linha) {
   if (username) payload.username = username
   const criado = isoOuUndefined(linha.created_at)
   if (criado) payload.created_at = criado
-  if (estaBloqueado(linha)) payload.status = 'blocked'
+  payload.status = estaBloqueado(linha) ? 'blocked' : 'offline'
   return payload
 }
 
@@ -117,9 +128,20 @@ export function hashPayload(payload) {
   return createHash('sha1').update(canonizar(payload), 'utf8').digest('hex').slice(0, 12)
 }
 
-/** snap:{slug}:{id}:{sha1(payload canônico)[:12]} */
-export function chaveIdempotencia(slug, id, payload) {
-  return `snap:${slug}:${id}:${hashPayload(payload)}`
+/** Balde de uma hora em UTC, formato AAAAMMDDHH (ex.: 2026111822). */
+export function baldeHoraUtc(data = new Date()) {
+  const dois = (n) => String(n).padStart(2, '0')
+  return `${data.getUTCFullYear()}${dois(data.getUTCMonth() + 1)}${dois(data.getUTCDate())}${dois(data.getUTCHours())}`
+}
+
+/** snap:{slug}:{id}:{sha1(payload canônico)[:12]}[-rN]:{AAAAMMDDHH} */
+export function chaveIdempotencia(slug, id, payload, balde = baldeHoraUtc(), revisita = 0) {
+  return `snap:${slug}:${id}:${hashPayload(payload)}${revisita ? `-r${revisita}` : ''}:${balde}`
+}
+
+/** snap:{slug}:{id}:deleted[-rN]:{AAAAMMDDHH} */
+export function chaveExclusao(slug, id, balde = baldeHoraUtc(), revisita = 0) {
+  return `snap:${slug}:${id}:deleted${revisita ? `-r${revisita}` : ''}:${balde}`
 }
 
 /** HMAC-SHA256 (hex) de "{timestamp}.{corpo bruto}", como o Control Center confere. */
@@ -192,6 +214,7 @@ export function criarRetratoUsuarios(opcoes = {}) {
   const segredo = String(opcoes.segredo || '').trim()
   const ativo = Boolean(base && slug && segredo.length >= 16)
   const consultar = opcoes.consultar || consultarUsuariosPg
+  const obterBalde = opcoes.balde || baldeHoraUtc // injetável nos testes (hora fixa)
   const limite = opcoes.limite || LIMITE_USUARIOS
   const intervaloMs = opcoes.intervaloMs ?? lerIntervaloMin(opcoes.intervaloMin) * 60_000
   const primeiroAtrasoMs = opcoes.primeiroAtrasoMs ?? (() => 45_000 + Math.floor(Math.random() * 15_000))
@@ -211,41 +234,49 @@ export function criarRetratoUsuarios(opcoes = {}) {
 
   // Memória do processo
   const conhecidos = new Set() // ids vistos na última leitura completa
-  const pendentesExclusao = new Map() // id -> chave do user.deleted ainda não entregue
-  const estado = new Map() // id -> { hash, chave } do último payload
-  const usadas = new Set() // chaves já usadas por este processo
+  const pendentesExclusao = new Map() // id -> revisita (-rN) do user.deleted ainda não entregue
+  const estado = new Map() // id -> { hash, revisita } do último payload
+  const usadas = new Set() // chaves já usadas por este processo NO BALDE (hora) ATUAL
+  let baldeDasUsadas = null
+
+  /** As chaves de uma hora nunca se repetem na hora seguinte: a memória recomeça a cada balde. */
+  function zerarUsadasSeBaldeMudou(balde) {
+    if (baldeDasUsadas !== balde) {
+      usadas.clear()
+      baldeDasUsadas = balde
+    }
+  }
 
   /**
-   * Chave estável: igual enquanto o payload não muda. Se o payload VOLTA a um estado anterior
-   * (ex.: bloqueou e desbloqueou), a chave pura já foi usada e o Control Center a trataria como
-   * repetida (ignoraria o evento); então ganha o sufixo -r1, -r2...
+   * Chave estável dentro da hora: igual enquanto o payload não muda. Se o payload VOLTA a um estado
+   * anterior na mesma hora (ex.: bloqueou e desbloqueou), a chave já foi usada e o Control Center a
+   * trataria como repetida (ignoraria o evento); então ganha o sufixo -r1, -r2...
    */
-  function chaveDoUsuario(payload) {
+  function chaveDoUsuario(payload, balde) {
+    zerarUsadasSeBaldeMudou(balde)
     const id = payload.external_id
     const hash = hashPayload(payload)
     const anterior = estado.get(id)
-    if (anterior && anterior.hash === hash) return anterior.chave
-    let chave = chaveIdempotencia(slug, id, payload)
-    if (usadas.has(chave)) {
-      let n = 1
-      while (usadas.has(`${chave}-r${n}`)) n++
-      chave = `${chave}-r${n}`
+    if (anterior && anterior.hash === hash) {
+      const chave = chaveIdempotencia(slug, id, payload, balde, anterior.revisita)
+      usadas.add(chave)
+      return chave
     }
-    if (usadas.size > 50_000) usadas.clear()
+    let revisita = 0
+    while (usadas.has(chaveIdempotencia(slug, id, payload, balde, revisita))) revisita++
+    const chave = chaveIdempotencia(slug, id, payload, balde, revisita)
     usadas.add(chave)
-    estado.set(id, { hash, chave })
+    estado.set(id, { hash, revisita })
     return chave
   }
 
-  function chaveDeExclusao(id) {
-    let chave = chaveIdempotencia(slug, id, { external_id: id })
-    if (usadas.has(chave)) {
-      let n = 1
-      while (usadas.has(`${chave}-r${n}`)) n++
-      chave = `${chave}-r${n}`
-    }
-    usadas.add(chave)
-    return chave
+  /** Nova remoção detectada: escolhe o -rN que ainda não foi usado nesta hora (usuário que voltou e saiu de novo). */
+  function revisitaDaExclusao(id, balde) {
+    zerarUsadasSeBaldeMudou(balde)
+    let revisita = 0
+    while (usadas.has(chaveExclusao(slug, id, balde, revisita))) revisita++
+    usadas.add(chaveExclusao(slug, id, balde, revisita))
+    return revisita
   }
 
   /** Uma tentativa de envio. Nunca lança; devolve { ok, novo, motivo }. */
@@ -306,6 +337,14 @@ export function criarRetratoUsuarios(opcoes = {}) {
         return r
       }
 
+      // Um só balde (hora UTC) para o ciclo inteiro, mesmo que ele atravesse a virada da hora.
+      let balde
+      try {
+        balde = String(obterBalde())
+      } catch {
+        balde = baldeHoraUtc()
+      }
+
       const itens = []
       const vistos = new Set()
       for (const linha of linhas) {
@@ -317,7 +356,7 @@ export function criarRetratoUsuarios(opcoes = {}) {
         }
         if (!payload || vistos.has(payload.external_id)) continue
         vistos.add(payload.external_id)
-        itens.push({ tipo: 'user.updated', payload, chave: chaveDoUsuario(payload) })
+        itens.push({ tipo: 'user.updated', payload, chave: chaveDoUsuario(payload, balde) })
       }
       r.total = itens.length
 
@@ -331,18 +370,20 @@ export function criarRetratoUsuarios(opcoes = {}) {
           if (vistos.has(id)) continue
           conhecidos.delete(id)
           estado.delete(id)
-          pendentesExclusao.set(id, chaveDeExclusao(id))
+          pendentesExclusao.set(id, revisitaDaExclusao(id, balde))
         }
       } else if (truncada) {
         r.truncada = true
       }
       for (const id of vistos) conhecidos.add(id)
 
-      const exclusoes = [...pendentesExclusao].map(([id, chave]) => ({
-        tipo: 'user.deleted',
-        payload: { external_id: id },
-        chave,
-      }))
+      // Remoção não entregue é repetida a cada ciclo: mesma chave dentro da hora; na hora seguinte,
+      // chave nova (o Control Center processa de novo).
+      const exclusoes = [...pendentesExclusao].map(([id, revisita]) => {
+        const chave = chaveExclusao(slug, id, balde, revisita)
+        usadas.add(chave)
+        return { tipo: 'user.deleted', payload: { external_id: id }, chave }
+      })
 
       const todos = [...itens, ...exclusoes]
       let seguidas = 0
