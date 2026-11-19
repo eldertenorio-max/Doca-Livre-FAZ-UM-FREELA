@@ -1,16 +1,20 @@
 // Avisa o Doca Livre Control Center quando uma funcionalidade deste sistema falha:
 // resposta 5xx (inclui as do PostgREST), serviço de dados parado ou erro fatal do servidor.
+// Também conta ao painel quem está USANDO o sistema agora (session.heartbeat; ver "Presença" abaixo).
 //
 // Variáveis (sem elas o aviso fica DESLIGADO e nada muda no sistema):
 //   DOCA_CC_URL             ex.: https://doca-livre-control-center.onrender.com/api
 //   DOCA_CC_SYSTEM_SLUG     ex.: oferta-carga
 //   DOCA_CC_WEBHOOK_SECRET  segredo (HMAC) combinado com o Control Center, mínimo 16 caracteres
 //   DOCA_CC_SYSTEM_NAME     (opcional) nome para as mensagens
+//   DOCA_CC_HEARTBEAT_SEC   (opcional) presença: no máximo 1 envio por usuário a cada N segundos;
+//                           padrão 60 (entre 10 e 3600); 0 desliga só a presença (os avisos continuam)
 //
 // Garantias: nunca atrasa nem derruba uma resposta (envio em segundo plano, com limite de tempo,
 // sem lançar erro); agrupa repetições; no máximo 20 avisos por minuto; não envia o corpo dos pedidos,
 // só a mensagem de erro, a rota e quem estava usando.
 import { createHmac, randomUUID } from 'node:crypto'
+import { lerToken, tokenDoPedido } from './auth.mjs'
 
 const base = String(process.env.DOCA_CC_URL || '').trim().replace(/\/+$/, '')
 const segredo = String(process.env.DOCA_CC_WEBHOOK_SECRET || '').trim()
@@ -44,11 +48,12 @@ function logarFalha(motivo) {
   console.error(`[control-center] aviso não enviado: ${motivo}`)
 }
 
-async function enviarUmaVez(corpo, limiteMs) {
+/** POST assinado (HMAC de "{timestamp}.{corpo}") em {base}/webhooks/{slug}. Rejeita se não for 2xx. */
+async function postarAssinado(destino, corpo, limiteMs, fetchFn = globalThis.fetch) {
   const bruto = JSON.stringify(corpo)
   const carimbo = String(Math.floor(Date.now() / 1000)) // a cada tentativa: nova assinatura
-  const assinatura = createHmac('sha256', segredo).update(`${carimbo}.${bruto}`, 'utf8').digest('hex')
-  const resposta = await fetch(`${base}/webhooks/${slug}`, {
+  const assinatura = createHmac('sha256', destino.segredo).update(`${carimbo}.${bruto}`, 'utf8').digest('hex')
+  const resposta = await fetchFn(`${destino.base}/webhooks/${destino.slug}`, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -59,7 +64,12 @@ async function enviarUmaVez(corpo, limiteMs) {
     body: bruto,
     signal: AbortSignal.timeout(limiteMs),
   })
+  await resposta.text().catch(() => '') // lê a resposta (curta) para liberar a conexão
   if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`)
+}
+
+function enviarUmaVez(corpo, limiteMs) {
+  return postarAssinado({ base, slug, segredo }, corpo, limiteMs)
 }
 
 /**
@@ -147,14 +157,143 @@ function telaDoPedido(req) {
   }
 }
 
+// ---------- Presença ("online agora" no painel) ----------
+// Quando um pedido com sessão VÁLIDA (token assinado e no prazo, conferido por lerToken de auth.mjs)
+// termina atendido (status 2xx/3xx), envia session.heartbeat com { external_id } e nada mais. O
+// external_id é o `sub` do token, que é o id da conta em mao_contas: o MESMO que cc-usuarios.mjs manda
+// no retrato. O painel marca o usuário como online e o volta a offline se nada chegar dentro do prazo
+// dele (SESSION_HEARTBEAT_TTL_SECONDS); usuário que o painel não conhece é ignorado lá.
+// Garantias: roda depois que a resposta já saiu (evento 'finish') e em segundo plano; nunca lança;
+// no máximo 1 envio por usuário a cada DOCA_CC_HEARTBEAT_SEC; memória limitada (5000 usuários; sai o
+// mais antigo); no máximo 20 envios simultâneos; tempo limite de 5 s; após 3 falhas seguidas, pausa de
+// 5 min; pedido sem sessão (ou com token inválido/vencido) não envia nada.
+
+/** DOCA_CC_HEARTBEAT_SEC -> segundos: vazio/inválido = 60; 0 = desligado; senão entre 10 e 3600. */
+export function lerIntervaloHeartbeat(valor) {
+  const s = String(valor ?? '').trim()
+  const n = Number(s)
+  if (!s || !Number.isFinite(n) || n < 0) return 60
+  if (n === 0) return 0
+  return Math.min(3600, Math.max(10, n))
+}
+
+/** Mesmo external_id do retrato (cc-usuarios.mjs: texto(id, 200)): o `sub`, sem espaços nas pontas, até 200 caracteres. */
+export function externalIdDoToken(claims) {
+  if (!claims || typeof claims !== 'object' || claims.sub === null || claims.sub === undefined) return undefined
+  const s = String(claims.sub).trim()
+  return s ? s.slice(0, 200) : undefined
+}
+
+/** Cria o enviador de presença. Tudo injetável nos testes (relógio, fetch, leitura da sessão, log). */
+export function criarPresenca(opcoes = {}) {
+  const destino = {
+    base: String(opcoes.base || '').trim().replace(/\/+$/, ''),
+    slug: String(opcoes.slug || '').trim(),
+    segredo: String(opcoes.segredo || '').trim(),
+  }
+  const intervaloMs = lerIntervaloHeartbeat(opcoes.intervaloSec) * 1000
+  const ativa = Boolean(destino.base && destino.slug && destino.segredo.length >= 16 && intervaloMs > 0)
+  const lerSessao = opcoes.lerSessao || ((req) => lerToken(tokenDoPedido(req)))
+  const agora = opcoes.agora || Date.now
+  const fetchFn = opcoes.fetch // vazio: o fetch do Node
+  const timeoutMs = opcoes.timeoutMs ?? 5000
+  const falhasMax = opcoes.falhasMax ?? 3
+  const pausaMs = opcoes.pausaMs ?? 5 * 60_000
+  const limiteUsuarios = opcoes.limiteUsuarios ?? 5000
+  const maxSimultaneos = opcoes.maxSimultaneos ?? 20
+  const log = opcoes.log || ((m) => console.error(`[control-center] ${m}`))
+
+  const ultimoEnvio = new Map() // external_id -> quando enviou; ordem de inserção = do mais antigo ao mais novo
+  let falhasSeguidas = 0
+  let pausadaAte = 0
+  let emAndamento = 0
+
+  function falhou(erro) {
+    falhasSeguidas++
+    if (falhasSeguidas < falhasMax) return
+    falhasSeguidas = 0
+    pausadaAte = agora() + pausaMs
+    const nome = erro?.name
+    const motivo = nome === 'TimeoutError' || nome === 'AbortError' ? 'tempo esgotado' : String(erro?.message || 'erro').slice(0, 80)
+    try {
+      log(`presença pausada por ${Math.round(pausaMs / 1000)} s após ${falhasMax} falhas seguidas (${motivo})`)
+    } catch {
+      /* log nunca pode causar erro */
+    }
+  }
+
+  /** Chame quando a resposta terminar. Devolve true se disparou um envio. Nunca lança nem espera. */
+  function registrar(req, status) {
+    if (!ativa) return false
+    try {
+      if (!(status >= 200 && status < 400) || req.method === 'OPTIONS') return false
+      const url = String(req.url || '').split('?')[0]
+      if (url === '/saude' || url === '/') return false
+      const t = agora()
+      if (t < pausadaAte || emAndamento >= maxSimultaneos) return false
+      const id = externalIdDoToken(lerSessao(req))
+      if (!id) return false // anônimo, token inválido ou vencido
+      const ultimo = ultimoEnvio.get(id)
+      if (ultimo !== undefined && t - ultimo < intervaloMs) return false
+      ultimoEnvio.delete(id) // reinsere no fim
+      ultimoEnvio.set(id, t)
+      while (ultimoEnvio.size > limiteUsuarios) ultimoEnvio.delete(ultimoEnvio.keys().next().value)
+      const corpo = {
+        event_type: 'session.heartbeat',
+        idempotency_key: `hb:${destino.slug}:${id}:${t}`,
+        occurred_at: new Date(t).toISOString(),
+        system_slug: destino.slug,
+        payload: { external_id: id },
+      }
+      emAndamento++
+      postarAssinado(destino, corpo, timeoutMs, fetchFn)
+        .then(
+          () => {
+            falhasSeguidas = 0
+          },
+          falhou,
+        )
+        .finally(() => {
+          emAndamento--
+        })
+        .catch(() => {})
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  return {
+    ativa,
+    registrar,
+    estado: () => ({
+      ativa,
+      usuarios: ultimoEnvio.size,
+      falhasSeguidas,
+      pausadaAte,
+      emAndamento,
+      intervaloMs,
+      timeoutMs,
+      falhasMax,
+      pausaMs,
+      limiteUsuarios,
+    }),
+  }
+}
+
+export const presenca = criarPresenca({ base, slug, segredo, intervaloSec: process.env.DOCA_CC_HEARTBEAT_SEC })
+export const presencaAtiva = presenca.ativa
+
 /**
  * Chame no começo do tratador de pedidos. Quando a resposta termina com 5xx, avisa.
  * `res.erroDetalhe` (texto curto) pode ser preenchido pelo sistema para explicar o erro.
  * A rota de saúde fica de fora: o Control Center já a acompanha.
+ * Também registra a presença de quem fez o pedido com sessão válida (ver "Presença").
  */
 export function observarResposta(req, res, rotulos = {}) {
   if (!avisosAtivos) return
   res.on('finish', () => {
+    presenca.registrar(req, res.statusCode) // nunca lança
     try {
       const status = res.statusCode
       if (status < 500) return
