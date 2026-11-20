@@ -18,12 +18,16 @@ html[data-tema='escuro'] {
   --dl-texto: #f4f4f5;
   --dl-texto-medio: #d4d4d8;
   --dl-texto-sec: #a1a1aa;
-  --dl-primaria: #5c6bc0;
-  --dl-primaria-media: #7986cb;
-  --dl-primaria-suave: rgba(121, 134, 203, 0.16);
-  --dl-primaria-borda: rgba(121, 134, 203, 0.45);
+  /* cor principal igual à do WMS no escuro: amarelo com texto escuro; cabeçalho das tabelas grafite */
+  --dl-primaria: #f5c518;
+  --dl-primaria-media: #ffd84a;
+  --dl-primaria-suave: rgba(245, 197, 24, 0.14);
+  --dl-primaria-borda: rgba(245, 197, 24, 0.45);
+  --dl-texto-sobre-primaria: #111111;
+  --dl-tabela-cabecalho: #26262b;
+  --dl-tabela-cabecalho-texto: #e4e4e7;
   --dl-sombra-card: none;
-  --dl-link: #60a5fa;
+  --dl-link: #f5c518;
   --dl-boas-vindas-fundo: #111113;
   --sidebar-border: #2e2e33;
 }
@@ -51,8 +55,4 @@ html[data-tema='escuro'] .dl-perfil-painel {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
 }
 
-/* Botão principal do login: o azul-marinho do claro some no fundo escuro; no escuro vai o amarelo (como no WMS). */
-html[data-tema='escuro'] .portal-login__submit {
-  background: #f5c518;
-  color: #111111;
-}
+/* A entrada (seleção de portal e login) fica igual à do WMS nos dois temas: ver o fim de tema-docalivre.css. */

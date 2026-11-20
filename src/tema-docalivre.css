@@ -29,6 +29,10 @@
   --dl-primaria-suave: #e8eaf6;
   --dl-primaria-borda: #c5cae9;
   --dl-sombra-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  /* texto sobre a cor principal e cabeçalho das tabelas (no escuro viram os do WMS: amarelo com texto escuro, cabeçalho grafite) */
+  --dl-texto-sobre-primaria: #ffffff;
+  --dl-tabela-cabecalho: var(--dl-primaria);
+  --dl-tabela-cabecalho-texto: #ffffff;
 
   /* variáveis que o resto do app já usa */
   --sidebar-bg: var(--dl-menu-bg);
@@ -513,8 +517,8 @@ body {
 
 .px-shell .px-main table thead th,
 .cf-shell .cf-main table thead th {
-  background: var(--dl-primaria);
-  color: #fff;
+  background: var(--dl-tabela-cabecalho);
+  color: var(--dl-tabela-cabecalho-texto);
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -532,7 +536,13 @@ body {
 .td-editor-pri {
   background: var(--dl-primaria);
   border-color: var(--dl-primaria);
-  color: #fff;
+  color: var(--dl-texto-sobre-primaria);
+}
+
+/* outros elementos pintados com a cor principal do Admin */
+.px-shell .px-count-pill,
+.px-shell .px-chat-fab {
+  color: var(--dl-texto-sobre-primaria);
 }
 
 .px-shell .px-btn-primary:hover,
@@ -544,7 +554,7 @@ body {
 .td-editor-pri:hover {
   background: var(--dl-primaria-media);
   border-color: var(--dl-primaria-media);
-  color: #fff;
+  color: var(--dl-texto-sobre-primaria);
   filter: none;
 }
 
@@ -566,7 +576,7 @@ body {
 .td-fin-filtros button.on {
   background: var(--dl-primaria);
   border-color: var(--dl-primaria);
-  color: #fff;
+  color: var(--dl-texto-sobre-primaria);
 }
 
 /* botões de opção com borda fina, como os do WMS */
@@ -583,7 +593,7 @@ body {
 
 .cf-shell .cf-opcoes button.on,
 .cf-shell .cf-opcoes button.on:hover {
-  color: #fff;
+  color: var(--dl-texto-sobre-primaria);
 }
 
 /* cartão escolhido (ex.: tipo de pesquisa) em azul-marinho claro */
@@ -608,4 +618,218 @@ body {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
   outline: none;
+}
+
+/* ======================================================= Entrada: seleção de portal, login e cadastro
+   Igual à tela de login do WMS: ilustração escura de fundo, cartão claro translúcido no centro,
+   campos com borda fina e botão azul. A logo e os textos continuam os mesmos. */
+div.portal-select,
+div.portal-login,
+div.auth-screen {
+  background:
+    radial-gradient(ellipse at center, rgba(8, 11, 22, 0.15) 0%, rgba(8, 11, 22, 0.55) 100%),
+    url('/login-bg.svg') center / cover no-repeat fixed,
+    #12172a;
+}
+
+.portal-select .portal-select__inner,
+.portal-login .portal-login__card,
+.auth-screen .auth-card {
+  background: rgba(248, 250, 252, 0.96);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  animation: dl-cartao-entra 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.portal-login .portal-login__card {
+  padding: 48px 40px;
+}
+
+.portal-select .portal-select__inner {
+  padding: 44px 40px 36px;
+}
+
+.auth-screen .auth-card {
+  padding: 40px 36px;
+}
+
+@keyframes dl-cartao-entra {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* nome do produto embaixo da logo, como o "WMS" do login do WMS */
+.portal-login .portal-login__produto {
+  margin: 0 0 24px;
+  font-size: 1.35rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #000000;
+}
+
+.portal-login .portal-login__header {
+  margin-bottom: 28px;
+}
+
+.portal-login .portal-login__title,
+.auth-screen .auth-title {
+  margin: 0 0 6px;
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #0f172a;
+}
+
+.portal-login .portal-login__tagline,
+.auth-screen .auth-slogan {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.portal-login .portal-login__label {
+  margin-top: 10px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.portal-login .portal-login__input {
+  border: 1.5px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 0.9375rem;
+  color: #0f172a;
+  background: #ffffff;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.portal-login .portal-login__input--password {
+  padding-right: 48px;
+}
+
+.portal-login .portal-login__input::placeholder {
+  color: #94a3b8;
+}
+
+.portal-login .portal-login__input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+}
+
+/* olho da senha sem moldura, cinza como no WMS */
+.portal-login .portal-login__password-toggle {
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+}
+
+.portal-login .portal-login__password-toggle:hover {
+  border: none;
+  background: transparent;
+  color: #475569;
+}
+
+.portal-login .portal-login__submit {
+  margin-top: 18px;
+  padding: 13px 24px;
+  border-radius: 10px;
+  background: #2563eb;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.portal-login .portal-login__submit:hover:not(:disabled) {
+  background: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+
+.portal-login .portal-login__submit:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* mensagens em caixinha, como as do login do WMS */
+.portal-login .portal-login__erro {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.portal-login .portal-login__info {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  background: #f0fdf4;
+  color: #15803d;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.portal-login .portal-login__link,
+.portal-select .portal-select__admin {
+  color: #2563eb;
+}
+
+/* seleção de portal: cartões brancos de borda fina dentro do cartão translúcido */
+.portal-select .portal-select__slogan {
+  color: #64748b;
+}
+
+.portal-select .portal-select__card {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.portal-select .portal-select__card:hover {
+  border-color: #1a237e;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+}
+
+@media (max-width: 768px) {
+  .portal-login .portal-login__card,
+  .portal-select .portal-select__inner,
+  .auth-screen .auth-card {
+    padding: 36px 28px;
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .portal-login .portal-login__card,
+  .portal-select .portal-select__inner,
+  .auth-screen .auth-card {
+    padding: 28px 20px;
+    border-radius: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-select .portal-select__inner,
+  .portal-login .portal-login__card,
+  .auth-screen .auth-card {
+    animation: none;
+  }
 }

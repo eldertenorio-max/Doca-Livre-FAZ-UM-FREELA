@@ -42,7 +42,7 @@
   border-radius: 999px;
   padding: 7px 14px;
   background: var(--dl-primaria, #283593);
-  color: #fff;
+  color: var(--dl-texto-sobre-primaria, #fff);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 700;
