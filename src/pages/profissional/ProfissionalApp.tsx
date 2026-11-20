@@ -62,7 +62,7 @@ export function ProfissionalApp({ onLogout }: { onLogout: () => void }) {
 
   if (!prof) {
     return (
-      <div className="auth-screen">
+      <div className="auth-screen tema-forcar-claro">
         <div className="auth-card">
           <p>Trabalhador não encontrado.</p>
           <p className="muted" style={{ marginTop: 8 }}>

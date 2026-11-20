@@ -470,7 +470,7 @@ export function CadastroProfissionalScreen({ onBack, onDone }: Props) {
   }
 
   return (
-    <div className="auth-screen auth-screen--scroll">
+    <div className="auth-screen auth-screen--scroll tema-forcar-claro">
       <form
         className="auth-card auth-card--wide"
         onSubmit={step === ETAPAS.length ? submit : (e) => { e.preventDefault(); next() }}
