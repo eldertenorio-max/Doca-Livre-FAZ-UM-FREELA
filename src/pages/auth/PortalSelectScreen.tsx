@@ -22,7 +22,7 @@ type Props = {
 export function PortalSelectScreen({ onEmpresa, onProfissional, onAdmin }: Props) {
   const [verApp, setVerApp] = useState(false)
   return (
-    <div className="portal-select">
+    <div className="portal-select tema-forcar-claro">
       <div className="portal-select__inner">
         <img src={LOGO_DOCA_LIVRE_SRC} alt="Doca Livre" className="portal-select__logo" />
         <h1 className="portal-select__brand">fazumfreela</h1>

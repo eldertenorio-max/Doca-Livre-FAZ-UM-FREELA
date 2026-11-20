@@ -449,7 +449,7 @@ export function PortalLoginScreen({ portal, avisoInicial, onSuccess, onBack }: P
   }
 
   return (
-    <div className="portal-login">
+    <div className="portal-login tema-forcar-claro">
       <div className="portal-login__card">
         <div className="portal-login__header">
           <img src={LOGO_DOCA_LIVRE_SRC} alt="Doca Livre" className="portal-login__logo" />

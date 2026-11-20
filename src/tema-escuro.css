@@ -36,13 +36,11 @@ html[data-tema='escuro'] body {
   background: #111113;
 }
 
-/* Logo da Doca Livre: versão para fundo escuro (contorno e "LIVRE" em branco). */
+/* Logo da Doca Livre: versão para fundo escuro (contorno e "LIVRE" em branco).
+   As telas de entrada ficam claras (abaixo), então lá continua a logo clara, como no WMS e no Oferta de Carga. */
 html[data-tema='escuro'] .px-topbar-logo,
 html[data-tema='escuro'] .cf-topbar-logo,
 html[data-tema='escuro'] .app-topbar-logo,
-html[data-tema='escuro'] .portal-select__logo,
-html[data-tema='escuro'] .portal-login__logo,
-html[data-tema='escuro'] .auth-logo,
 html[data-tema='escuro'] .dl-boas-vindas-logo {
   content: url('/logo-doca-livre-escuro.png?v=2026-11-09');
 }
@@ -55,4 +53,36 @@ html[data-tema='escuro'] .dl-perfil-painel {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
 }
 
-/* A entrada (seleção de portal e login) fica igual à do WMS nos dois temas: ver o fim de tema-docalivre.css. */
+/* ---------- Telas que ficam claras (como no WMS e no Oferta de Carga: entrada, login e cadastro) ----------
+   Quem tem a classe .tema-forcar-claro não recebe as cópias escuras do build (scripts/temaEscuroPostcss.ts).
+   Aqui voltam os valores claros das variáveis, que são herdadas do :root escuro. */
+html[data-tema='escuro'] .tema-forcar-claro {
+  color-scheme: light;
+  --dl-fundo: #f8fafc;
+  --dl-card: #ffffff;
+  --dl-suave: #f1f5f9;
+  --dl-borda: #e2e8f0;
+  --dl-borda-forte: #cbd5e1;
+  --dl-titulo: #0f172a;
+  --dl-texto: #1e293b;
+  --dl-texto-medio: #475569;
+  --dl-texto-sec: #64748b;
+  --dl-primaria: #1a237e;
+  --dl-primaria-media: #283593;
+  --dl-primaria-suave: #e8eaf6;
+  --dl-primaria-borda: #c5cae9;
+  --dl-texto-sobre-primaria: #ffffff;
+  --dl-tabela-cabecalho: #1a237e;
+  --dl-tabela-cabecalho-texto: #ffffff;
+  --dl-sombra-card: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --dl-link: #2563eb;
+  --bg: #f8fafc;
+  --content-bg: #f8fafc;
+  --bg-panel: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --accent-fg: #000000;
+  color: #1e293b;
+}

@@ -622,13 +622,15 @@ body {
 
 /* ======================================================= Entrada: seleção de portal, login e cadastro
    Igual à tela de login do WMS: ilustração escura de fundo, cartão claro translúcido no centro,
-   campos com borda fina e botão azul. A logo e os textos continuam os mesmos. */
+   campos com borda fina e botão azul. A logo e os textos continuam os mesmos.
+   A ilustração é a do fazumfreela (profissionais da operação ligados às empresas), gerada por
+   scripts/gerar-fundo-login.mjs; ao gerar de novo, troque o ?v= abaixo para o navegador buscar a nova. */
 div.portal-select,
 div.portal-login,
 div.auth-screen {
   background:
     radial-gradient(ellipse at center, rgba(8, 11, 22, 0.15) 0%, rgba(8, 11, 22, 0.55) 100%),
-    url('/login-bg.svg') center / cover no-repeat fixed,
+    url('/login-bg.svg?v=2026-11-20') center / cover no-repeat fixed,
     #12172a;
 }
 

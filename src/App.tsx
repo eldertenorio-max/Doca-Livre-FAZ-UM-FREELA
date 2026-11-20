@@ -174,7 +174,7 @@ function AppRoutes() {
     if (portal === 'profissional') {
       if (!currentProfissional) {
         return (
-          <div className="auth-screen">
+          <div className="auth-screen tema-forcar-claro">
             <div className="auth-card">
               <p>Carregando painel do trabalhador…</p>
             </div>
@@ -187,7 +187,7 @@ function AppRoutes() {
     if (portal === 'empresa') {
       if (!currentEmpresa) {
         return (
-          <div className="auth-screen">
+          <div className="auth-screen tema-forcar-claro">
             <div className="auth-card">
               <p>Carregando painel da empresa…</p>
             </div>

@@ -28,7 +28,7 @@ export function EmpresaApp({ onLogout }: { onLogout: () => void }) {
 
   if (!empresa) {
     return (
-      <div className="auth-screen">
+      <div className="auth-screen tema-forcar-claro">
         <div className="auth-card">
           <p>Empresa não encontrada.</p>
           <button type="button" className="btn btn-primary" onClick={onLogout}>Sair</button>

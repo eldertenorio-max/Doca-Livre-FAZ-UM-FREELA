@@ -11,6 +11,8 @@
 // Toda regra com cor ganha a cópia (mesmo sem nada a converter), para que a ordem de prioridade
 // entre as regras continue a mesma do tema claro.
 // Regras escritas à mão para o tema escuro (com data-tema no seletor) passam sem cópia.
+// Telas que ficam claras mesmo no tema escuro (entrada e login, como no WMS e no Oferta de Carga) usam a
+// classe .tema-forcar-claro: nenhuma cópia escura vale dentro dela.
 import type { AtRule, Container, Declaration, Plugin, Rule } from 'postcss'
 
 const PREFIXO = 'html[data-tema="escuro"]'
@@ -160,11 +162,18 @@ function fundoMantido(regra: Rule) {
   return mantido
 }
 
+// Exclui as áreas que ficam claras. O :where() não soma prioridade: as regras escuras continuam
+// valendo na mesma ordem de antes no resto do sistema.
+const FORA_DO_CLARO = ':where(:not(.tema-forcar-claro, .tema-forcar-claro *))'
+
 function prefixar(seletor: string) {
   const s = seletor.trim()
   if (/^:root(?![\w-])/.test(s)) return s.replace(/^:root/, ':root[data-tema="escuro"]')
   if (/^html(?![\w-])/.test(s)) return s.replace(/^html/, PREFIXO)
-  return `${PREFIXO} ${s}`
+  // a exclusão entra antes do ::pseudo-elemento, se houver
+  const i = s.indexOf('::')
+  const comExclusao = i >= 0 ? `${s.slice(0, i)}${FORA_DO_CLARO}${s.slice(i)}` : `${s}${FORA_DO_CLARO}`
+  return `${PREFIXO} ${comExclusao}`
 }
 
 function dentroDeKeyframes(regra: Rule) {
