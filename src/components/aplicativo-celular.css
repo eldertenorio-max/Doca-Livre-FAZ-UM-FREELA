@@ -78,7 +78,7 @@
 .app-cel-btn--principal {
   border-color: var(--dl-primaria);
   background: var(--dl-primaria);
-  color: #ffffff;
+  color: var(--dl-texto-sobre-primaria, #ffffff);
 }
 
 .app-cel-btn--principal:hover:not(:disabled) {

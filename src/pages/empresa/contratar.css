@@ -2765,7 +2765,7 @@ button.cf-vaga-nome:disabled {
   justify-content: center;
   border-radius: 50%;
   background: var(--dl-primaria, #1a237e);
-  color: #fff;
+  color: var(--dl-texto-sobre-primaria, #fff);
   font-size: 0.78rem;
   font-weight: 800;
 }
