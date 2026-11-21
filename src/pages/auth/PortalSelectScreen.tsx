@@ -2,10 +2,12 @@ import { useState } from 'react'
 import { AplicativoJanela } from '../../components/AplicativoCelular'
 import { estaNoApp } from '../../lib/aplicativo'
 import { LOGO_DOCA_LIVRE_SRC, BRAND_SLOGAN } from '../../lib/brandAssets'
-import { emDemo, trocarModo } from '../../lib/modo'
+import { demoDisponivel, emDemo, trocarModo } from '../../lib/modo'
 import './PortalSelectScreen.css'
 
 function linkDeDemonstracao() {
+  // A demonstração saiu do site: o botão só existe no ambiente de desenvolvimento.
+  if (!demoDisponivel()) return false
   try {
     return new URLSearchParams(window.location.search).has('demo')
   } catch {
@@ -65,8 +67,8 @@ export function PortalSelectScreen({ onEmpresa, onProfissional, onAdmin }: Props
             Sair da demonstração e voltar ao sistema real
           </button>
         ) : (
-          // Fechado para o público desde a abertura dos cadastros (12/11/2026): a demonstração
-          // só aparece para quem abre o site com ?demo no endereço (fazumfreela.com.br/?demo).
+          // A demonstração saiu do site em 20/11/2026. No ambiente de desenvolvimento o botão aparece
+          // para quem abre com ?demo no endereço (ou entra direto por /demo).
           linkDeDemonstracao() && (
             <button type="button" className="portal-select__demo" onClick={() => trocarModo('demo')}>
               Ver demonstração (dados fictícios, só neste aparelho)

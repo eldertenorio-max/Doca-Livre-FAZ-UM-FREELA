@@ -11,7 +11,7 @@ npm run dev
 
 Abra o endereço do Vite (geralmente `http://localhost:5173`).
 
-O site local usa a API real (Azure). Para explorar sem tocar em dados reais, use **Ver demonstração** na tela inicial: dados fictícios, só no seu navegador. As contas de demonstração aparecem na própria tela de login do modo demo.
+O site local usa a API real (Azure). Para explorar sem tocar em dados reais, abra `http://localhost:5173/demo`: dados fictícios, só no seu navegador. As contas de demonstração aparecem na própria tela de login do modo demo. A demonstração só existe no ambiente de desenvolvimento (`npm run dev`); no site publicado ela foi retirada em 20/11/2026 e `/demo` apenas volta para o início.
 
 ## Como funciona
 
